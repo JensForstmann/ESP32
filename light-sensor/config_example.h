@@ -1,0 +1,5 @@
+// copy me to "config.h"
+#define WIFI_NAME "..."
+#define WIFI_PASSWORD "..."
+#define HTTP_URL "..."
+#define HTTP_TOKEN "..."
