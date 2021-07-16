@@ -5,13 +5,12 @@
 #include <HTTPClient.h>
 #include "config.h"
 
-
 const char* ssid = WIFI_NAME;
 const char* password = WIFI_PASSWORD;
+const char* device_name = WIFI_DEVICE_NAME;
 const char* url = HTTP_URL;
 const String token = HTTP_TOKEN;
 
-String my_ip;
 int value;
 int values[30];
 int avg;
@@ -28,46 +27,79 @@ void setup()
     Serial.println(F("SSD1306 allocation failed"));
     for (;;); // Don't proceed, loop forever
   }
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextWrap(false);
   Serial.println("display done");
   display.display();
 
-  Serial.print("init wlan");
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  if (WIFI_ENABLED) {
+    Serial.println("init wlan");
+    if (strlen(device_name)) {
+      WiFi.hostname(device_name);
+    }
+    WiFi.begin(ssid, password);
+    Serial.println("wlan done");
   }
-  Serial.println("");
-  Serial.println("wlan done");
-  Serial.print("my ip addresss: ");
-  my_ip = WiFi.localIP().toString();
-  Serial.println(my_ip);
-
+  
   Serial.println("setup done");
+}
+
+String pad(int width, String s) {
+  int diff = width - s.length();
+  for (int i = 0; i < diff; i++) {
+    s = " " + s;
+  }
+  return s;
 }
 
 void refreshDisplay() {
   display.clearDisplay();
-  display.setTextColor(SSD1306_WHITE);
+
+  // 1st (big) line: current ldr value
   display.setTextSize(5);
-  display.setCursor(0, 0);
-  if (loopCounter == 29) {
-    display.println("....");
+  display.setCursor(6, 1);
+  if (loopCounter == 29 && WIFI_ENABLED && HTTP_ENABLED) {
+    display.println("===>");
   } else {
-    display.println(value);  
+    display.println(pad(4, String(value)));
   }
-  display.setTextSize(1);
-  display.print(" Avg: ");
-  display.println(avg);
-  display.print("Addr: ");
-  display.println(my_ip);
-  display.print("Code: ");
-  display.println(lastHttpCode);
   
+  display.setTextSize(1);
+
+  // 2nd line: avg ldr value and possible http error message
+  display.setCursor(display.getCursorX() + 1, display.getCursorY() - 1);
+  display.print("AVG: ");
+  display.print(pad(4, String(avg)));
+  display.println(lastHttpCode == 200 || lastHttpCode == 0 ? "" : " - TX ERR");
+
+  // 3rd line: wifi ip address or wifi status text if not connected
+  display.setCursor(display.getCursorX() + 1, display.getCursorY());
+  int wifi_status = WiFi.status();
+  if (wifi_status == WL_CONNECTED) {
+    display.print(" IP: ");
+    display.println(WiFi.localIP().toString());
+  } else {
+    display.println(WiFiStautsText(wifi_status));
+  }
+
+  // 4th line: wifi signal strength (if connected)
+  display.setCursor(display.getCursorX() + 1, display.getCursorY());
+  if (wifi_status == WL_CONNECTED) {
+    display.print("SIG: ");
+    display.println(pad(4, String(WiFi.RSSI())));
+  }
+
+  // invert display in case of http error
+  display.invertDisplay(lastHttpCode != 200 && lastHttpCode != 0);
+
+  // render
   display.display();
 }
 
 void sendToHost() {
+  if (!WIFI_ENABLED || !HTTP_ENABLED) {
+    return;
+  }
   WiFiClient client;
   HTTPClient http;
   http.begin(client, url);
@@ -79,8 +111,22 @@ void sendToHost() {
   http.end();
 }
 
+String WiFiStautsText(int n) {
+  if (n == WL_CONNECTED) return "CONNECTED";
+  if (n == WL_NO_SHIELD) return "NO_SHIELD";
+  if (n == WL_IDLE_STATUS) return "IDLE_STATUS";
+  if (n == WL_NO_SSID_AVAIL) return "NO_SSID_AVAIL";
+  if (n == WL_SCAN_COMPLETED) return "SCAN_COMPLETED";
+  if (n == WL_CONNECT_FAILED) return "CONNECT_FAILED";
+  if (n == WL_CONNECTION_LOST) return "CONNECTION_LOST";
+  if (n == WL_DISCONNECTED) return "DISCONNECTED";
+  return "unkown";
+}
+
 void loop()
 {
+  Serial.println("-----loop-----");
+  
   value = analogRead(A0);
   Serial.print("value: ");
   Serial.println(value);
@@ -99,6 +145,12 @@ void loop()
   
   Serial.print("loopCounter: ");
   Serial.println(loopCounter);
+
+  Serial.print("WiFi Status: ");
+  Serial.println(WiFiStautsText(WiFi.status()));
+
+  Serial.print("WiFi RSSI: ");
+  Serial.println(WiFi.RSSI());
   
   refreshDisplay();
 
