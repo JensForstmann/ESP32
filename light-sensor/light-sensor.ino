@@ -5,10 +5,6 @@
 #include <HTTPClient.h>
 #include "config.h"
 
-const char* ssid = WIFI_NAME;
-const char* password = WIFI_PASSWORD;
-const char* device_name = WIFI_DEVICE_NAME;
-const char* url = HTTP_URL;
 const String token = HTTP_TOKEN;
 
 int value;
@@ -16,6 +12,7 @@ int values[30];
 int avg;
 int lastHttpCode;
 int loopCounter;
+int wifiConnectCounter;
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 
 void setup()
@@ -31,17 +28,40 @@ void setup()
   display.setTextWrap(false);
   Serial.println("display done");
   display.display();
-
-  if (WIFI_ENABLED) {
-    Serial.println("init wlan");
-    if (strlen(device_name)) {
-      WiFi.hostname(device_name);
-    }
-    WiFi.begin(ssid, password);
-    Serial.println("wlan done");
-  }
   
   Serial.println("setup done");
+}
+
+void wlan() {
+  if (WIFI_ENABLED && WiFi.status() != WL_CONNECTED) {
+    wifiConnectCounter++;
+    if (strlen(WIFI_DEVICE_NAME)) {
+      WiFi.hostname(WIFI_DEVICE_NAME);
+    }
+    Serial.print("connect to wlan: ");
+    Serial.print(WIFI_NAME);
+    Serial.print(" (");
+    Serial.print(wifiConnectCounter);
+    Serial.println(". time)");
+    WiFi.begin(WIFI_NAME, WIFI_PASSWORD);
+    for (int n = 0; WiFi.status() != WL_CONNECTED; n++) {
+      display.clearDisplay();
+      display.setTextSize(1);
+      display.setCursor(0, 0);
+      display.print("Connecting to ");
+      display.println(WIFI_NAME);
+      display.print(wifiConnectCounter);
+      display.println(". time");
+      display.print("waiting... ");
+      display.println(n);
+      display.invertDisplay(n % 2);
+      display.display();
+      
+      Serial.print(".");
+      
+      delay(1000);
+    }
+  }
 }
 
 String pad(int width, String s) {
@@ -58,7 +78,7 @@ void refreshDisplay() {
   // 1st (big) line: current ldr value
   display.setTextSize(5);
   display.setCursor(6, 1);
-  if (loopCounter == 29 && WIFI_ENABLED && HTTP_ENABLED) {
+  if (loopCounter == 29 && WIFI_ENABLED && HTTP_ENABLED) { // the moment when sending the value via http
     display.println("===>");
   } else {
     display.println(pad(4, String(value)));
@@ -72,21 +92,20 @@ void refreshDisplay() {
   display.print(pad(4, String(avg)));
   display.println(lastHttpCode == 200 || lastHttpCode == 0 ? "" : " - TX ERR");
 
-  // 3rd line: wifi ip address or wifi status text if not connected
-  display.setCursor(display.getCursorX() + 1, display.getCursorY());
-  int wifi_status = WiFi.status();
-  if (wifi_status == WL_CONNECTED) {
+  
+  if (WIFI_ENABLED) {
+    // 3rd line: wifi ip address or wifi status text if not connected
+    display.setCursor(display.getCursorX() + 1, display.getCursorY());
     display.print(" IP: ");
     display.println(WiFi.localIP().toString());
-  } else {
-    display.println(WiFiStautsText(wifi_status));
-  }
-
-  // 4th line: wifi signal strength (if connected)
-  display.setCursor(display.getCursorX() + 1, display.getCursorY());
-  if (wifi_status == WL_CONNECTED) {
+    
+    // 4th line: wifi signal strength (if connected)
+    display.setCursor(display.getCursorX() + 1, display.getCursorY());
     display.print("SIG: ");
-    display.println(pad(4, String(WiFi.RSSI())));
+    display.print(pad(4, String(WiFi.RSSI())));
+    display.print(" (");
+    display.print(wifiConnectCounter);
+    display.println(")");
   }
 
   // invert display in case of http error
@@ -102,30 +121,20 @@ void sendToHost() {
   }
   WiFiClient client;
   HTTPClient http;
-  http.begin(client, url);
+  http.begin(client, HTTP_URL);
   http.addHeader("Content-Type", "application/json");
-  String httpRequestData = "{\"token\":\"" + token + "\",\"ldr\":" + avg +"}";
+  String httpRequestData = "{\"token\":\"" + String(HTTP_TOKEN) + "\",\"value\":" + avg +"}";
   lastHttpCode = http.POST(httpRequestData);
   Serial.print("HTTP Response code: ");
   Serial.println(lastHttpCode);
   http.end();
 }
 
-String WiFiStautsText(int n) {
-  if (n == WL_CONNECTED) return "CONNECTED";
-  if (n == WL_NO_SHIELD) return "NO_SHIELD";
-  if (n == WL_IDLE_STATUS) return "IDLE_STATUS";
-  if (n == WL_NO_SSID_AVAIL) return "NO_SSID_AVAIL";
-  if (n == WL_SCAN_COMPLETED) return "SCAN_COMPLETED";
-  if (n == WL_CONNECT_FAILED) return "CONNECT_FAILED";
-  if (n == WL_CONNECTION_LOST) return "CONNECTION_LOST";
-  if (n == WL_DISCONNECTED) return "DISCONNECTED";
-  return "unkown";
-}
-
 void loop()
 {
   Serial.println("-----loop-----");
+
+  wlan();
   
   value = analogRead(A0);
   Serial.print("value: ");
@@ -145,12 +154,6 @@ void loop()
   
   Serial.print("loopCounter: ");
   Serial.println(loopCounter);
-
-  Serial.print("WiFi Status: ");
-  Serial.println(WiFiStautsText(WiFi.status()));
-
-  Serial.print("WiFi RSSI: ");
-  Serial.println(WiFi.RSSI());
   
   refreshDisplay();
 
