@@ -39,3 +39,17 @@ If `HTTP_ENABLED` is set to true, a json payload like this will be sent (POST) t
     "value": 1337, // the rolling average of the sensor
 }
 ```
+
+## circuit
+
+ESP32 A0/ADC0/GPIO36 --+-- LDR ----- 3.3V (@ESP32)
+                       |
+                       +-- 10k Ohm ----- GND (@ESP32)
+
+ESP32 I2C SCL/GPIO22 ----- SCL (@OLED display) ----- 10k Ohm ----- 3.3V (@ESP32)
+ESP32 I2C SDA/GPIO21 ----- SDA (@OLED display) ----- 10k Ohm ----- 3.3V (@ESP32)
+
+## components
+
+- OLED display: AZDelivery 0,96 Zoll OLED Display I2C SSD1306 Chip 128 x 64 Pixel I2C
+- ESP32: AZDelivery ESP32 NodeMCU Module WLAN WiFi Dev Kit C Development Board with CP2102
