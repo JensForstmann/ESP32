@@ -53,3 +53,7 @@ ESP32 I2C SDA/GPIO21 ----- SDA (@OLED display) ----- 10k Ohm ----- 3.3V (@ESP32)
 
 - OLED display: AZDelivery 0,96 Zoll OLED Display I2C SSD1306 Chip 128 x 64 Pixel I2C
 - ESP32: AZDelivery ESP32 NodeMCU Module WLAN WiFi Dev Kit C Development Board with CP2102
+
+## pinout
+
+![ESP32 Pinout Image](https://raw.githubusercontent.com/JensForstmann/ESP32/master/light-sensor/ESP32%20Pinout.jpg "ESP32 Pinout")
